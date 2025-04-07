@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>人脸识别系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>人脸识别系统</h1>
+    
+    <!-- 注册人脸 -->
+    <div class="section">
+        <h2>注册新用户</h2>
+        <input type="text" id="nameInput" placeholder="输入姓名">
+        <button onclick="captureForRegister()">拍照注册</button>
+        <div id="registerResult"></div>
+    </div>
+
+    <!-- 实时识别 -->
+    <div class="section">
+        <h2>实时识别</h2>
+        <video id="video" width="640" height="480" autoplay></video>
+        <div id="recognitionResult"></div>
+    </div>
+
+    <script>
+        // 初始化摄像头
+        const video = document.getElementById('video');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => video.srcObject = stream);
+
+        // 拍照注册
+        async function captureForRegister() {
+            const name = document.getElementById('nameInput').value;
+            if (!name) {
+                alert('请输入姓名');
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const image = canvas.toDataURL('image/jpeg');
+            const blob = await (await fetch(image)).blob();
+            
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('image', blob, 'capture.jpg');
+
+            fetch('/register', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('registerResult').innerText = 
+                        data.success ? '注册成功！' : '错误：' + data.error;
+                });
+        }
+
+        // 实时识别轮询
+        setInterval(async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const image = canvas.toDataURL('image/jpeg');
+            const blob = await (await fetch(image)).blob();
+            
+            const formData = new FormData();
+            formData.append('image', blob, 'frame.jpg');
+
+            fetch('/recognize', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('recognitionResult').innerText = 
+                        '识别结果：' + data.name;
+                });
+        }, 1000); // 每秒识别一次
+    </script>
+</body>
+</html>
